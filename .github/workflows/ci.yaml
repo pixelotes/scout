@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test ./...
+
+      - name: go build
+        run: go build -trimpath ./...
+
+      - name: Docker build
+        run: docker build -t scout-smoke .
+
+      - name: Smoke test — API health and auth
+        run: |
+          set -euo pipefail
+          docker run -d --rm --name scout-smoke \
+            -p 8090:8090 \
+            -e SCOUT_TOKEN=ci-smoke-test \
+            scout-smoke
+
+          for i in $(seq 1 30); do
+            if curl -fs -o /dev/null http://localhost:8090/healthz; then
+              echo "scout is up after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+
+          curl -fsS http://localhost:8090/healthz
+
+          # Without the token the API must refuse; with it, /v1/quota answers.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8090/v1/quota)
+          [ "$code" = 401 ] || { echo "::error::expected 401 without token, got $code"; exit 1; }
+          body=$(curl -fsS -H 'Authorization: Bearer ci-smoke-test' http://localhost:8090/v1/quota)
+          grep -q '"provider":"opensubtitles"' <<< "$body" \
+            || { echo "::error::quota response missing opensubtitles"; exit 1; }
+          echo "API present ✓"
+
+          # The CLI runs from the same image.
+          docker run --rm --entrypoint scout scout-smoke version
+
+      - name: Container logs
+        if: always()
+        run: docker logs scout-smoke || true
+
+      - name: Stop container
+        if: always()
+        run: docker stop scout-smoke || true

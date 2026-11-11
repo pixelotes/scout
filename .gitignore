@@ -1,2 +1,27 @@
-bin/
+config.yml
+config/config.yml
+/cache/
 *.part
+
+/scout
+/bin/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*.log
+.env
+.env.*
+!.env.example
+
+# Go build output
+*.exe
+*.test
+*.out
+/dist/
+coverage.out
+coverage.html
