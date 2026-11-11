@@ -16,7 +16,7 @@ jobs:
   govulncheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Reports only vulnerabilities in code paths the binary actually calls.
       - uses: golang/govulncheck-action@v1
