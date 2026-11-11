@@ -1,0 +1,45 @@
+# scout config. Every key is optional; SCOUT_* env vars override the file
+# (SCOUT_TMDB_API_KEY, SCOUT_OPENSUBTITLES_API_KEY, SCOUT_BACKENDS, ...).
+# Reel and RMS embed this same block under their `crawlers:` key.
+
+# Order to try. "service" = a scout server, "local" = providers in-process.
+# The next one is only tried when the previous fails (down, timeout, 5xx),
+# never when it answers "not found" or "quota exceeded".
+backends: ["local"]
+
+service:
+  url: "http://scout:8090"
+  token: ""            # must match server.token
+  timeout: 10s
+  max_failures: 3      # after this many failures in a row...
+  cooldown: 2m         # ...skip the service for this long
+
+local:
+  language: "en"
+  timeout: 15s
+  # Providers per kind, in order. Ones that need a key are skipped without it.
+  # movie: tmdb*, imdb, trakt*, anilist/kitsu (anime films)
+  # show:  tvmaze, tmdb*, trakt*
+  # anime: anilist, kitsu, tvmaze, tmdb*, trakt*        (* needs a key)
+  providers:
+    movie: ["tmdb", "imdb"]
+    show: ["tvmaze", "tmdb"]
+    anime: ["anilist", "kitsu", "tmdb"]
+  tmdb:
+    api_key: ""        # v3 key or v4 read token
+  trakt:
+    client_id: ""
+  opensubtitles:
+    api_key: ""
+    username: ""       # optional: raises the daily download quota
+    password: ""
+  subtitle_languages: ["en", "es"]
+  cache:
+    metadata_ttl: 24h  # 0 disables
+    max_entries: 5000
+    subtitle_dir: ""   # downloaded subtitles are kept here and never re-downloaded
+
+# Only for `scout serve`. The server always uses its local providers.
+server:
+  listen: ":8090"
+  token: ""            # when set, clients need "Authorization: Bearer <token>"
