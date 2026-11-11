@@ -431,7 +431,9 @@ func subsFetchCmd(ctx context.Context, b scout.Backend, cfg config.Config, args 
 	return nil
 }
 
-func pickBest(subs []scout.Subtitle, lang string) *scout.Subtitle { return scout.BestSubtitle(subs, lang) }
+func pickBest(subs []scout.Subtitle, lang string) *scout.Subtitle {
+	return scout.BestSubtitle(subs, lang)
+}
 
 func serve(ctx context.Context, cfg config.Config, args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
