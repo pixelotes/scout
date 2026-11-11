@@ -8,20 +8,21 @@ Part of [MangoStack](https://github.com/pixelotes/MangoStack), a self-hosted med
 
 - Memory: about 11 MB RSS after a few searches, measured in Docker on a Mac (arm64) with the default config. Not yet measured on a Raspberry Pi.
 - Binary: about 11 MB; the Docker image (Alpine) about 29 MB.
-- What raises memory: the metadata cache (`local.cache.max_entries`, results kept for `metadata_ttl`) and full show lookups with long episode lists.
+- What raises memory: the metadata cache (`local.cache.max_entries`, results kept for `metadata_ttl`), full show lookups with long episode lists, and season-pack subtitle downloads (about 25 MB RSS after opening a 28-episode Subdivx pack; the Go runtime returns it slowly).
 - CPU is negligible; lookups are network-bound.
 - Disk writes: only downloaded subtitles in `local.cache.subtitle_dir`, when set. The CLI's `nfo` and `subs fetch` commands write next to your media.
 
 ## Features
 
-- One API for every provider: TMDB, IMDb (keyless), TVMaze, AniList, Kitsu, Trakt for metadata; OpenSubtitles for subtitles.
+- One API for every provider: TMDB, IMDb (keyless), TVMaze, AniList, Kitsu, Trakt for metadata; OpenSubtitles, SubDL and Subdivx for subtitles.
 - Three ways to use it, all with the same code:
   - **Go module**: Reel and RMS import it and call the providers in-process.
   - **CLI**: `scout search`, `scout nfo`, `scout subs fetch`…
   - **HTTP service**: `scout serve` or the Docker image, so API keys, the cache and the OpenSubtitles quota live in one place.
 - Apps choose the order in `backends` (`service`, `local`, or both). The second is only used when the first fails (down, timeout, 5xx), never when it answers "not found" or "quota exceeded". A service that keeps failing is skipped for a while.
 - Every result carries all the external IDs the provider knows (`imdb`, `tmdb`, `tvdb`, `tvmaze`, `anilist`, `kitsu`, `mal`, `trakt`), and the NFO writer stores all of them as `<uniqueid>`.
-- Subtitle search goes hash → IDs → text and stops at the first step that finds something. The caller computes the OpenSubtitles hash, so the service never needs access to the video files.
+- Subtitle providers are searched together and their candidates merged, so a language one lacks can come from another. Within OpenSubtitles the search goes hash → IDs → text. The caller computes the hash, so the service never needs access to the video files.
+- Season packs (SubDL, Subdivx) are opened and the right episode picked, by `S01E02`/`1x02` or by the bare number anime packs use (`Show_-_02_(1080p).srt`). Subtitles are converted to UTF-8.
 - Downloaded subtitles are cached on disk and never charged against the quota twice. Once the daily quota is used up, Scout stops calling the API until it resets.
 - Kodi/Jellyfin NFO files and artwork (`poster.jpg`, `folder.jpg`, `fanart.jpg`, `backdrop.jpg`, `logo.png`) with the names RMS reads.
 
@@ -34,6 +35,8 @@ Part of [MangoStack](https://github.com/pixelotes/MangoStack), a self-hosted med
 | kitsu | anime films | | ✅ | — |
 | trakt | ✅ | ✅ | ✅ | client ID |
 | opensubtitles (subtitles) | ✅ | ✅ | ✅ | API key |
+| subdl (subtitles) | ✅ | ✅ | ✅ | API key (free) |
+| subdivx (Spanish subtitles) | ✅ | ✅ | ✅ | a FlareSolverr-compatible solver, e.g. [Parasol](https://github.com/pixelotes/parasol) |
 
 ## Quick start
 
@@ -85,6 +88,11 @@ local:
     api_key: ""
   opensubtitles:
     api_key: ""
+  subdl:
+    api_key: ""
+  subdivx:
+    flaresolverr_url: "http://parasol:8191"
+  subtitle_providers: ["opensubtitles", "subdl", "subdivx"]
   subtitle_languages: ["en", "es"]
   cache:
     metadata_ttl: 24h
@@ -104,6 +112,9 @@ server:
 | `SCOUT_MOVIE_PROVIDERS`, `SCOUT_SHOW_PROVIDERS`, `SCOUT_ANIME_PROVIDERS` | `local.providers.*` |
 | `SCOUT_TMDB_API_KEY`, `SCOUT_TRAKT_CLIENT_ID` | provider keys |
 | `SCOUT_OPENSUBTITLES_API_KEY`, `_USERNAME`, `_PASSWORD` | OpenSubtitles account |
+| `SCOUT_SUBDL_API_KEY` | `local.subdl.api_key` |
+| `SCOUT_FLARESOLVERR_URL` | `local.subdivx.flaresolverr_url` |
+| `SCOUT_SUBTITLE_PROVIDERS` | `local.subtitle_providers` |
 | `SCOUT_SUBTITLE_LANGUAGES` | `local.subtitle_languages` |
 | `SCOUT_SUBTITLE_CACHE_DIR` | `local.cache.subtitle_dir` (`/cache/subtitles` in Docker) |
 | `SCOUT_LISTEN`, `SCOUT_TOKEN` | `server.listen`, `server.token` |
@@ -175,10 +186,13 @@ GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o scout ./cmd/scout
 - IMDb has no public API: the `imdb` provider relies on IMDb's search suggestions and Stremio's Cinemeta, neither of which promises stability. Keep `tmdb` first when you have a key.
 - AniList has no episode titles; its episodes are numbered. Kitsu has them.
 - TVMaze is English only; `language` affects TMDB alone.
-- OpenSubtitles is the only subtitle provider for now.
+- Only OpenSubtitles searches by file hash. SubDL searches by ID or title, Subdivx by title only.
+- Subdivx is scraping behind Cloudflare, not an API: it breaks when the site or the challenge changes, and allows one search every ~3 seconds (Scout waits). Bazarr dropped it for that reason.
+- SubDL's response handling was written from its documentation and tested against a fake server; not yet checked with a real key.
+- RAR archives are not supported (neither SubDL nor Subdivx serves them today).
 - The metadata cache is in memory and is lost on restart.
 - One shared token, no per-client keys. Do not expose Scout to the internet; it assumes a trusted LAN.
-- Not yet used by Reel or RMS.
+- Reel uses it (pixelotes/reel#16); RMS does not yet.
 
 ## Part of MangoStack
 

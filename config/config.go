@@ -50,6 +50,18 @@ type Local struct {
 		Username string `yaml:"username"`
 		Password string `yaml:"password"`
 	} `yaml:"opensubtitles"`
+	SubDL struct {
+		APIKey string `yaml:"api_key"`
+	} `yaml:"subdl"`
+	Subdivx struct {
+		// FlareSolverr-compatible endpoint (Parasol, FlareSolverr) that
+		// solves subdivx.com's Cloudflare challenge. Empty disables subdivx.
+		FlareSolverrURL string `yaml:"flaresolverr_url"`
+	} `yaml:"subdivx"`
+	// SubtitleProviders lists the subtitle providers to use. All of them
+	// are searched at once and their results merged; ones without their key
+	// or solver are skipped.
+	SubtitleProviders []string `yaml:"subtitle_providers"`
 	SubtitleLanguages []string `yaml:"subtitle_languages"`
 	Cache             Cache    `yaml:"cache"`
 }
@@ -82,6 +94,7 @@ func Default() Config {
 		scout.Anime: {"tvmaze", "anilist", "kitsu", "tmdb"},
 	}
 	c.Local.SubtitleLanguages = []string{"en"}
+	c.Local.SubtitleProviders = []string{"opensubtitles", "subdl", "subdivx"}
 	c.Local.Cache.MetadataTTL = 24 * time.Hour
 	c.Local.Cache.MaxEntries = 5000
 	c.Server.Listen = ":8090"
@@ -125,6 +138,9 @@ func (c *Config) applyEnv() {
 	set(&c.Local.OpenSubtitles.Username, "SCOUT_OPENSUBTITLES_USERNAME")
 	set(&c.Local.OpenSubtitles.Password, "SCOUT_OPENSUBTITLES_PASSWORD")
 	list(&c.Local.SubtitleLanguages, "SCOUT_SUBTITLE_LANGUAGES")
+	list(&c.Local.SubtitleProviders, "SCOUT_SUBTITLE_PROVIDERS")
+	set(&c.Local.SubDL.APIKey, "SCOUT_SUBDL_API_KEY")
+	set(&c.Local.Subdivx.FlareSolverrURL, "SCOUT_FLARESOLVERR_URL")
 	set(&c.Local.Cache.SubtitleDir, "SCOUT_SUBTITLE_CACHE_DIR")
 	set(&c.Server.Listen, "SCOUT_LISTEN")
 	set(&c.Server.Token, "SCOUT_TOKEN")

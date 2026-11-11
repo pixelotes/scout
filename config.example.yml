@@ -33,6 +33,14 @@ local:
     api_key: ""
     username: ""       # optional: raises the daily download quota
     password: ""
+  subdl:
+    api_key: ""        # free, from your subdl.com profile
+  subdivx:
+    # Spanish subtitles from subdivx.com, which sits behind a Cloudflare
+    # challenge: needs a FlareSolverr-compatible solver (Parasol, FlareSolverr).
+    flaresolverr_url: ""   # e.g. http://parasol:8191
+  # Searched together and merged; providers without their key/solver are skipped.
+  subtitle_providers: ["opensubtitles", "subdl", "subdivx"]
   subtitle_languages: ["en", "es"]
   cache:
     metadata_ttl: 24h  # 0 disables

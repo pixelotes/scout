@@ -23,7 +23,7 @@ import (
 // Backend implements scout.Backend with local providers.
 type Backend struct {
 	reg    *metadata.Registry
-	subs   *subtitles.OpenSubtitles
+	subs   *subtitles.Multi
 	lang   string
 	cache  *ttlCache
 	subDir string
@@ -45,11 +45,8 @@ func New(c config.Local) *Backend {
 		providers = append(providers, metadata.NewTrakt(c.Trakt.ClientID, c.Timeout))
 	}
 	b := &Backend{
-		reg: metadata.NewRegistry(c.Providers, providers...),
-		subs: subtitles.NewOpenSubtitles(subtitles.OpenSubtitlesConfig{
-			APIKey: c.OpenSubtitles.APIKey, Username: c.OpenSubtitles.Username,
-			Password: c.OpenSubtitles.Password, Languages: c.SubtitleLanguages, Timeout: c.Timeout,
-		}),
+		reg:    metadata.NewRegistry(c.Providers, providers...),
+		subs:   subtitles.NewMulti(subtitleProviders(c)...),
 		lang:   c.Language,
 		subDir: c.Cache.SubtitleDir,
 	}
@@ -58,6 +55,35 @@ func New(c config.Local) *Backend {
 	}
 	return b
 }
+
+// subtitleProviders builds the configured subtitle providers in order,
+// skipping the ones whose key or challenge solver is missing.
+func subtitleProviders(c config.Local) []subtitles.Provider {
+	var out []subtitles.Provider
+	for _, name := range c.SubtitleProviders {
+		switch name {
+		case "opensubtitles":
+			if c.OpenSubtitles.APIKey != "" {
+				out = append(out, subtitles.NewOpenSubtitles(subtitles.OpenSubtitlesConfig{
+					APIKey: c.OpenSubtitles.APIKey, Username: c.OpenSubtitles.Username,
+					Password: c.OpenSubtitles.Password, Languages: c.SubtitleLanguages, Timeout: c.Timeout,
+				}))
+			}
+		case "subdl":
+			if c.SubDL.APIKey != "" {
+				out = append(out, subtitles.NewSubDL(c.SubDL.APIKey, c.SubtitleLanguages, c.Timeout))
+			}
+		case "subdivx":
+			if c.Subdivx.FlareSolverrURL != "" {
+				out = append(out, subtitles.NewSubdivx(c.Subdivx.FlareSolverrURL, c.Timeout))
+			}
+		}
+	}
+	return out
+}
+
+// SubtitleProviders lists the subtitle providers in use.
+func (b *Backend) SubtitleProviders() []string { return b.subs.Names() }
 
 func (b *Backend) Search(ctx context.Context, q scout.Query) ([]scout.Item, error) {
 	q.Language = orDefault(q.Language, b.lang)
@@ -96,22 +122,22 @@ var safeID = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 // DownloadSubtitle serves from the disk cache when it can, so the same file is
 // never charged against the quota twice.
 func (b *Backend) DownloadSubtitle(ctx context.Context, provider, fileID string) (*scout.SubtitleFile, error) {
-	if provider != "" && provider != b.subs.Name() {
-		return nil, fmt.Errorf("unknown subtitle provider %q: %w", provider, scout.ErrBadRequest)
+	if provider == "" {
+		provider = "opensubtitles"
 	}
-	if !safeID.MatchString(fileID) {
+	if !safeID.MatchString(provider) || !safeID.MatchString(fileID) {
 		return nil, fmt.Errorf("invalid file id: %w", scout.ErrBadRequest)
 	}
 	var dataPath, namePath string
 	if b.subDir != "" {
-		dir := filepath.Join(b.subDir, b.subs.Name())
+		dir := filepath.Join(b.subDir, provider)
 		dataPath, namePath = filepath.Join(dir, fileID), filepath.Join(dir, fileID+".name")
 		if data, err := os.ReadFile(dataPath); err == nil {
 			name, _ := os.ReadFile(namePath)
 			return &scout.SubtitleFile{FileName: orDefault(string(name), fileID+".srt"), Data: data}, nil
 		}
 	}
-	f, err := b.subs.Download(ctx, fileID)
+	f, err := b.subs.Download(ctx, provider, fileID)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +151,7 @@ func (b *Backend) DownloadSubtitle(ctx context.Context, provider, fileID string)
 }
 
 func (b *Backend) Quota(context.Context) ([]scout.Quota, error) {
-	return []scout.Quota{b.subs.Quota()}, nil
+	return b.subs.Quotas(), nil
 }
 
 func writeAtomic(path string, data []byte) error {

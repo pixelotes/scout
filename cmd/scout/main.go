@@ -445,7 +445,13 @@ func serve(ctx context.Context, cfg config.Config, args []string) error {
 		log.Warn("no TMDB key: tmdb provider disabled")
 	}
 	if cfg.Local.OpenSubtitles.APIKey == "" {
-		log.Warn("no OpenSubtitles key: subtitle lookups will fail")
+		log.Warn("no OpenSubtitles key: opensubtitles disabled")
+	}
+	if cfg.Local.SubDL.APIKey == "" {
+		log.Warn("no SubDL key: subdl disabled")
+	}
+	if cfg.Local.Subdivx.FlareSolverrURL == "" {
+		log.Warn("no FlareSolverr URL: subdivx disabled")
 	}
 	// The server always answers with its own providers: chaining to another
 	// service from here would only hide misconfiguration.
