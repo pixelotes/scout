@@ -6,6 +6,7 @@ package scout
 import (
 	"context"
 	"errors"
+	"strings"
 )
 
 // Kind is the type of media being looked up.
@@ -143,4 +144,36 @@ var (
 func IsAnswer(err error) bool {
 	return errors.Is(err, ErrNotFound) || errors.Is(err, ErrBadRequest) ||
 		errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrUnsupported)
+}
+
+// BestSubtitle picks the candidate to download for lang: a hash match first,
+// then trusted uploaders, then the most downloaded. Machine translations
+// only win when nothing else exists. Returns nil when lang has no candidate.
+func BestSubtitle(subs []Subtitle, lang string) *Subtitle {
+	lang = strings.ToLower(lang)
+	score := func(s *Subtitle) int {
+		n := min(s.Downloads, 1_000_000)
+		if s.HashMatch {
+			n += 10_000_000
+		}
+		if s.Trusted {
+			n += 2_000_000
+		}
+		if s.MachineMade {
+			n -= 50_000_000
+		}
+		return n
+	}
+	var best *Subtitle
+	for i := range subs {
+		s := &subs[i]
+		l := strings.ToLower(s.Language)
+		if l != lang && !strings.HasPrefix(l, lang+"-") {
+			continue
+		}
+		if best == nil || score(s) > score(best) {
+			best = s
+		}
+	}
+	return best
 }

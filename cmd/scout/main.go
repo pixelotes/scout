@@ -431,32 +431,7 @@ func subsFetchCmd(ctx context.Context, b scout.Backend, cfg config.Config, args 
 	return nil
 }
 
-func pickBest(subs []scout.Subtitle, lang string) *scout.Subtitle {
-	var best *scout.Subtitle
-	score := func(s *scout.Subtitle) int {
-		n := min(s.Downloads, 1_000_000)
-		if s.HashMatch {
-			n += 10_000_000
-		}
-		if s.Trusted {
-			n += 2_000_000
-		}
-		if s.MachineMade {
-			n -= 50_000_000
-		}
-		return n
-	}
-	for i := range subs {
-		s := &subs[i]
-		if !strings.EqualFold(s.Language, lang) && !strings.HasPrefix(strings.ToLower(s.Language), strings.ToLower(lang)+"-") {
-			continue
-		}
-		if best == nil || score(s) > score(best) {
-			best = s
-		}
-	}
-	return best
-}
+func pickBest(subs []scout.Subtitle, lang string) *scout.Subtitle { return scout.BestSubtitle(subs, lang) }
 
 func serve(ctx context.Context, cfg config.Config, args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
