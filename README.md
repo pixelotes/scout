@@ -80,7 +80,7 @@ local:
   providers:
     movie: ["tmdb", "imdb"]
     show: ["tvmaze", "tmdb"]
-    anime: ["anilist", "kitsu", "tmdb"]
+    anime: ["tvmaze", "anilist", "kitsu", "tmdb"]
   tmdb:
     api_key: ""
   opensubtitles:

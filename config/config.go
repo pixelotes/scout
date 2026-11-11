@@ -79,7 +79,7 @@ func Default() Config {
 	c.Local.Providers = map[scout.Kind][]string{
 		scout.Movie: {"tmdb", "imdb"},
 		scout.Show:  {"tvmaze", "tmdb"},
-		scout.Anime: {"anilist", "kitsu", "tmdb"},
+		scout.Anime: {"tvmaze", "anilist", "kitsu", "tmdb"},
 	}
 	c.Local.SubtitleLanguages = []string{"en"}
 	c.Local.Cache.MetadataTTL = 24 * time.Hour

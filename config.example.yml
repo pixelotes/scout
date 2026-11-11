@@ -24,7 +24,7 @@ local:
   providers:
     movie: ["tmdb", "imdb"]
     show: ["tvmaze", "tmdb"]
-    anime: ["anilist", "kitsu", "tmdb"]
+    anime: ["tvmaze", "anilist", "kitsu", "tmdb"]
   tmdb:
     api_key: ""        # v3 key or v4 read token
   trakt:
